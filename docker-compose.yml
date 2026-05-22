@@ -1,0 +1,37 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: organization
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d organization"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  migrate:
+    build: .
+    command: ["goose", "-dir", "/app/migrations", "postgres", "postgres://postgres:postgres@postgres:5432/organization?sslmode=disable", "up"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  api:
+    build: .
+    environment:
+      HTTP_PORT: 8080
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/organization?sslmode=disable
+    ports:
+      - "8080:8080"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+volumes:
+  postgres_data:
